@@ -128,7 +128,7 @@ impl<'huff, ValueType, D: TreeDegree> Decoder<'huff, ValueType, D> {
     pub fn decode_vec<F: Clone + Into<u32>>(
         &mut self,
         coding: &'huff Coding<ValueType, D>,
-        fragments: &Vec<F>,
+        fragments: &[F],
     ) -> DecodingResult<&'huff ValueType> {
         // Use an index to manually iterate over the vector
         let mut index = 0;

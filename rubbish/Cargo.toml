@@ -1,0 +1,13 @@
+[package]
+name = "rubbish"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bitm = "0.4.1"
+butils = "0.1.0"
+dyn_size_of = "0.4.2"
+minimum_redundancy = { version = "0.3", path = "../minimum_redundancy" }
+num_cpus = "1.16.0"
