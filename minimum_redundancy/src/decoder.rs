@@ -124,6 +124,34 @@ impl<'huff, ValueType, D: TreeDegree> Decoder<'huff, ValueType, D> {
         DecodingResult::Incomplete
     }
 
+    #[inline]
+    pub fn decode_vec<F: Clone + Into<u32>>(
+        &mut self,
+        coding: &'huff Coding<ValueType, D>,
+        fragments: &Vec<F>,
+    ) -> DecodingResult<&'huff ValueType> {
+        // Use an index to manually iterate over the vector
+        let mut index = 0;
+        while index < fragments.len() {
+            let fragment = &fragments[index];
+            // Convert the fragment into u32 and pass it to self.consume
+            match self.consume(coding, fragment.clone().into()) {
+                DecodingResult::Incomplete => {
+                    // Just increment the index if the result is Incomplete
+                    index += 1;
+                    continue;
+                }
+                result => {
+                    // Return any other result
+                    return result;
+                }
+            }
+        }
+
+        // Return Incomplete if all fragments are processed and no other result is returned
+        DecodingResult::Incomplete
+    }
+
     /// Tries to decode and return a single value from the `fragments` iterator,
     /// consuming as many fragments as needed.
     ///
