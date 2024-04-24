@@ -85,7 +85,7 @@ impl<ValueType, D: TreeDegree> Coding<ValueType, D> {
 
     /// Returns decoder that allows for decoding a value.
     #[inline] pub fn decoder(&self) -> Decoder<ValueType, D> {
-        return Decoder::<ValueType, D>::new(self);
+        return Decoder::<ValueType, D>::new(self.degree.as_u32());
     }
 
     /// Construct coding (of given `degree`) for the given `values`, where
@@ -439,13 +439,13 @@ mod tests {
                 'c' => Code{ content: 0b10, len: 2 }
                ));
         let mut decoder_for_a = huffman.decoder();
-        assert_eq!(decoder_for_a.consume(1), DecodingResult::Value(&'a'));
+        assert_eq!(decoder_for_a.consume(&huffman, 1), DecodingResult::Value(&'a'));
         let mut decoder_for_b = huffman.decoder();
-        assert_eq!(decoder_for_b.consume(0), DecodingResult::Incomplete);
-        assert_eq!(decoder_for_b.consume(0), DecodingResult::Value(&'b'));
+        assert_eq!(decoder_for_b.consume(&huffman, 0), DecodingResult::Incomplete);
+        assert_eq!(decoder_for_b.consume(&huffman, 0), DecodingResult::Value(&'b'));
         let mut decoder_for_c = huffman.decoder();
-        assert_eq!(decoder_for_c.consume(0), DecodingResult::Incomplete);
-        assert_eq!(decoder_for_c.consume(1), DecodingResult::Value(&'c'));
+        assert_eq!(decoder_for_c.consume(&huffman, 0), DecodingResult::Incomplete);
+        assert_eq!(decoder_for_c.consume(&huffman, 1), DecodingResult::Value(&'c'));
         assert_eq!(huffman.codes().len(), 3);
         assert_eq!(huffman.levels().len(), 2);
         assert_eq!(huffman.levels().map(|(v, _, _)| v.len()).collect::<Vec<_>>(), &[1, 2]);
@@ -472,13 +472,13 @@ mod tests {
                 'c' => Code{ content: 2, len: 1 }
         ));
         let mut decoder_for_a = huffman.decoder();
-        assert_eq!(decoder_for_a.consume(0), DecodingResult::Value(&'a'));
+        assert_eq!(decoder_for_a.consume(&huffman, 0), DecodingResult::Value(&'a'));
         let mut decoder_for_b = huffman.decoder();
-        assert_eq!(decoder_for_b.consume(1), DecodingResult::Value(&'b'));
+        assert_eq!(decoder_for_b.consume(&huffman, 1), DecodingResult::Value(&'b'));
         let mut decoder_for_c = huffman.decoder();
-        assert_eq!(decoder_for_c.consume(2), DecodingResult::Value(&'c'));
+        assert_eq!(decoder_for_c.consume(&huffman, 2), DecodingResult::Value(&'c'));
         let mut decoder_for_invalid = huffman.decoder();
-        assert_eq!(decoder_for_invalid.consume(3), DecodingResult::Invalid);
+        assert_eq!(decoder_for_invalid.consume(&huffman, 3), DecodingResult::Invalid);
         assert_eq!(huffman.codes().len(), 3);
         assert_eq!(huffman.levels().len(), 1);
         assert_eq!(huffman.levels().map(|(v, _, _)| v.len()).collect::<Vec<_>>(), &[3]);
@@ -514,28 +514,28 @@ mod tests {
                 'f' => Code{content: 0b11, len: 2 }
                ));
         let mut decoder_for_a = huffman.decoder();
-        assert_eq!(decoder_for_a.consume(0), DecodingResult::Incomplete);
-        assert_eq!(decoder_for_a.consume(0), DecodingResult::Incomplete);
-        assert_eq!(decoder_for_a.consume(1), DecodingResult::Value(&'a'));
+        assert_eq!(decoder_for_a.consume(&huffman, 0), DecodingResult::Incomplete);
+        assert_eq!(decoder_for_a.consume(&huffman, 0), DecodingResult::Incomplete);
+        assert_eq!(decoder_for_a.consume(&huffman, 1), DecodingResult::Value(&'a'));
         let mut decoder_for_b = huffman.decoder();
-        assert_eq!(decoder_for_b.consume(0), DecodingResult::Incomplete);
-        assert_eq!(decoder_for_b.consume(0), DecodingResult::Incomplete);
-        assert_eq!(decoder_for_b.consume(0), DecodingResult::Incomplete);
-        assert_eq!(decoder_for_b.consume(0), DecodingResult::Value(&'b'));
+        assert_eq!(decoder_for_b.consume(&huffman, 0), DecodingResult::Incomplete);
+        assert_eq!(decoder_for_b.consume(&huffman, 0), DecodingResult::Incomplete);
+        assert_eq!(decoder_for_b.consume(&huffman, 0), DecodingResult::Incomplete);
+        assert_eq!(decoder_for_b.consume(&huffman, 0), DecodingResult::Value(&'b'));
         let mut decoder_for_c = huffman.decoder();
-        assert_eq!(decoder_for_c.consume(0), DecodingResult::Incomplete);
-        assert_eq!(decoder_for_c.consume(0), DecodingResult::Incomplete);
-        assert_eq!(decoder_for_c.consume(0), DecodingResult::Incomplete);
-        assert_eq!(decoder_for_c.consume(1), DecodingResult::Value(&'c'));
+        assert_eq!(decoder_for_c.consume(&huffman, 0), DecodingResult::Incomplete);
+        assert_eq!(decoder_for_c.consume(&huffman, 0), DecodingResult::Incomplete);
+        assert_eq!(decoder_for_c.consume(&huffman, 0), DecodingResult::Incomplete);
+        assert_eq!(decoder_for_c.consume(&huffman, 1), DecodingResult::Value(&'c'));
         let mut decoder_for_d = huffman.decoder();
-        assert_eq!(decoder_for_d.consume(0), DecodingResult::Incomplete);
-        assert_eq!(decoder_for_d.consume(1), DecodingResult::Value(&'d'));
+        assert_eq!(decoder_for_d.consume(&huffman, 0), DecodingResult::Incomplete);
+        assert_eq!(decoder_for_d.consume(&huffman, 1), DecodingResult::Value(&'d'));
         let mut decoder_for_e = huffman.decoder();
-        assert_eq!(decoder_for_e.consume(1), DecodingResult::Incomplete);
-        assert_eq!(decoder_for_e.consume(0), DecodingResult::Value(&'e'));
+        assert_eq!(decoder_for_e.consume(&huffman, 1), DecodingResult::Incomplete);
+        assert_eq!(decoder_for_e.consume(&huffman, 0), DecodingResult::Value(&'e'));
         let mut decoder_for_f = huffman.decoder();
-        assert_eq!(decoder_for_f.consume(1), DecodingResult::Incomplete);
-        assert_eq!(decoder_for_f.consume(1), DecodingResult::Value(&'f'));
+        assert_eq!(decoder_for_f.consume(&huffman, 1), DecodingResult::Incomplete);
+        assert_eq!(decoder_for_f.consume(&huffman, 1), DecodingResult::Value(&'f'));
         assert_eq!(huffman.codes().len(), 6);
         assert_eq!(huffman.levels().len(), 4);
         assert_eq!(huffman.levels().map(|(v, _, _)| v.len()).collect::<Vec<_>>(), &[0, 3, 1, 2]);
@@ -570,23 +570,23 @@ mod tests {
                 'f' => Code{content: 0b11, len: 1 }
                ));
         let mut decoder_for_a = huffman.decoder();
-        assert_eq!(decoder_for_a.consume(0), DecodingResult::Incomplete);
-        assert_eq!(decoder_for_a.consume(0), DecodingResult::Value(&'a'));
+        assert_eq!(decoder_for_a.consume(&huffman, 0), DecodingResult::Incomplete);
+        assert_eq!(decoder_for_a.consume(&huffman, 0), DecodingResult::Value(&'a'));
         let mut decoder_for_b = huffman.decoder();
-        assert_eq!(decoder_for_b.consume(0), DecodingResult::Incomplete);
-        assert_eq!(decoder_for_b.consume(1), DecodingResult::Value(&'b'));
+        assert_eq!(decoder_for_b.consume(&huffman, 0), DecodingResult::Incomplete);
+        assert_eq!(decoder_for_b.consume(&huffman, 1), DecodingResult::Value(&'b'));
         let mut decoder_for_c = huffman.decoder();
-        assert_eq!(decoder_for_c.consume(0), DecodingResult::Incomplete);
-        assert_eq!(decoder_for_c.consume(2), DecodingResult::Value(&'c'));
+        assert_eq!(decoder_for_c.consume(&huffman, 0), DecodingResult::Incomplete);
+        assert_eq!(decoder_for_c.consume(&huffman, 2), DecodingResult::Value(&'c'));
         let mut decoder_for_invalid = huffman.decoder();
-        assert_eq!(decoder_for_invalid.consume(0), DecodingResult::Incomplete);
-        assert_eq!(decoder_for_invalid.consume(3), DecodingResult::Invalid);
+        assert_eq!(decoder_for_invalid.consume(&huffman, 0), DecodingResult::Incomplete);
+        assert_eq!(decoder_for_invalid.consume(&huffman, 3), DecodingResult::Invalid);
         let mut decoder_for_d = huffman.decoder();
-        assert_eq!(decoder_for_d.consume(1), DecodingResult::Value(&'d'));
+        assert_eq!(decoder_for_d.consume(&huffman, 1), DecodingResult::Value(&'d'));
         let mut decoder_for_e = huffman.decoder();
-        assert_eq!(decoder_for_e.consume(2), DecodingResult::Value(&'e'));
+        assert_eq!(decoder_for_e.consume(&huffman, 2), DecodingResult::Value(&'e'));
         let mut decoder_for_f = huffman.decoder();
-        assert_eq!(decoder_for_f.consume(3), DecodingResult::Value(&'f'));
+        assert_eq!(decoder_for_f.consume(&huffman, 3), DecodingResult::Value(&'f'));
         assert_eq!(huffman.codes().len(), 6);
         assert_eq!(huffman.levels().len(), 2);
         assert_eq!(huffman.levels().map(|(v, _, _)| v.len()).collect::<Vec<_>>(), &[3, 3]);
@@ -619,21 +619,21 @@ mod tests {
                 'e' => Code{content: 2, len: 1 }
                ));
         let mut decoder_for_a = huffman.decoder();
-        assert_eq!(decoder_for_a.consume(0), DecodingResult::Incomplete);
-        assert_eq!(decoder_for_a.consume(0), DecodingResult::Value(&'a'));
+        assert_eq!(decoder_for_a.consume(&huffman, 0), DecodingResult::Incomplete);
+        assert_eq!(decoder_for_a.consume(&huffman, 0), DecodingResult::Value(&'a'));
         let mut decoder_for_b = huffman.decoder();
-        assert_eq!(decoder_for_b.consume(0), DecodingResult::Incomplete);
-        assert_eq!(decoder_for_b.consume(1), DecodingResult::Value(&'b'));
+        assert_eq!(decoder_for_b.consume(&huffman, 0), DecodingResult::Incomplete);
+        assert_eq!(decoder_for_b.consume(&huffman, 1), DecodingResult::Value(&'b'));
         let mut decoder_for_c = huffman.decoder();
-        assert_eq!(decoder_for_c.consume(0), DecodingResult::Incomplete);
-        assert_eq!(decoder_for_c.consume(2), DecodingResult::Value(&'c'));
+        assert_eq!(decoder_for_c.consume(&huffman, 0), DecodingResult::Incomplete);
+        assert_eq!(decoder_for_c.consume(&huffman, 2), DecodingResult::Value(&'c'));
         let mut decoder_for_invalid = huffman.decoder();
-        assert_eq!(decoder_for_invalid.consume(0), DecodingResult::Incomplete);
-        assert_eq!(decoder_for_invalid.consume(3), DecodingResult::Invalid);
+        assert_eq!(decoder_for_invalid.consume(&huffman, 0), DecodingResult::Incomplete);
+        assert_eq!(decoder_for_invalid.consume(&huffman, 3), DecodingResult::Invalid);
         let mut decoder_for_d = huffman.decoder();
-        assert_eq!(decoder_for_d.consume(1), DecodingResult::Value(&'d'));
+        assert_eq!(decoder_for_d.consume(&huffman, 1), DecodingResult::Value(&'d'));
         let mut decoder_for_e = huffman.decoder();
-        assert_eq!(decoder_for_e.consume(2), DecodingResult::Value(&'e'));
+        assert_eq!(decoder_for_e.consume(&huffman, 2), DecodingResult::Value(&'e'));
         assert_eq!(huffman.codes().len(), 5);
         assert_eq!(huffman.levels().len(), 2);
         assert_eq!(huffman.levels().map(|(v, _, _)| v.len()).collect::<Vec<_>>(), &[2, 3]);

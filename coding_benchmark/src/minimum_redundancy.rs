@@ -4,7 +4,7 @@ use std::hint::black_box;
 use bitm::{BitAccess, BitVec};
 use butils::UnitPrefix;
 use dyn_size_of::GetSize;
-use minimum_redundancy::{BitsPerFragment, Code, Coding};
+use minimum_redundancy::{BitsPerFragment, Code, Coding, TreeDegree};
 use minimum_redundancy::Frequencies;
 
 use crate::compare_texts;
@@ -74,9 +74,9 @@ pub fn frequencies(conf: &super::Conf, text: &[u8]) -> HashMap::<u8, usize> {
 #[inline(always)] fn decode(coding: &Coding<u8>, mut bits: impl Iterator<Item = bool>) {
     let mut d = coding.decoder();
     while let Some(b) = bits.next() {
-        if let minimum_redundancy::DecodingResult::Value(v) = d.consume(b as u32) {
+        if let minimum_redundancy::DecodingResult::Value(v) = d.consume(coding, b as u32) {
             black_box(v);
-            d.reset();
+            d.reset(coding.degree.as_u32());
         }
     }
 }
@@ -93,9 +93,9 @@ pub fn frequencies(conf: &super::Conf, text: &[u8]) -> HashMap::<u8, usize> {
     let mut decoded_text = Vec::with_capacity(uncompressed_len);
     let mut d = coding.decoder();
     while let Some(b) = bits.next() {
-        if let minimum_redundancy::DecodingResult::Value(v) = d.consume(b as u32) {
+        if let minimum_redundancy::DecodingResult::Value(v) = d.consume(coding, b as u32) {
             decoded_text.push(*v);
-            d.reset();
+            d.reset(coding.degree.as_u32());
         }
     }
     decoded_text
