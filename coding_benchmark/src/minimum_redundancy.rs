@@ -1,5 +1,6 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::hint::black_box;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread;
 
@@ -107,14 +108,66 @@ fn decode(coding: &Coding<u8>, mut bits: impl Iterator<Item = bool>) {
 }
 
 #[inline(always)]
-fn decode_spec(coding: Arc<Coding<u8>>, bits: Vec<bool>) {
-    let coding = coding.clone();
-    let mut main_iter = bits.into_iter();
-    let mut d = coding.decoder();
-    while let Some(b) = main_iter.next() {
-        if let minimum_redundancy::DecodingResult::Value(v) = d.consume(&coding, b as u32) {
-            black_box(v);
-            d.reset(coding.degree.as_u32());
+fn decode_spec(coding: Arc<Coding<u8>>, bits: Arc<Vec<bool>>) {
+    let cursor = Arc::new(AtomicUsize::new(0));
+
+    loop {
+        let unique_code_lengths: HashSet<u32> = coding.code_lengths().values().cloned().collect();
+        let mut sorted_code_lengths: Vec<u32> = Vec::from_iter(unique_code_lengths);
+        sorted_code_lengths.sort_unstable(); // sort_unstable is often faster and appropriate here
+        let num_cores = std::cmp::max(1, num_cpus::get() - 2);
+        let top_num_cores_code_lengths =
+            sorted_code_lengths[..num_cores.min(sorted_code_lengths.len())].to_vec();
+
+        let bits_arc = Arc::clone(&bits);
+        let coding_arc = Arc::clone(&coding);
+        let cursor_arc = Arc::clone(&cursor);
+
+        let producer_handle = thread::spawn(move || {
+            let mut len = 0;
+            let mut decoder = coding_arc.decoder();
+            let mut bits_iter = bits_arc[cursor_arc.load(Ordering::SeqCst)..].into_iter();
+            while let Some(b) = bits_iter.next() {
+                len += 1;
+                if let minimum_redundancy::DecodingResult::Value(v) =
+                    decoder.consume(&coding_arc, *b as u32)
+                {
+                    black_box(v);
+                    return len;
+                }
+            }
+            panic!("invalid encoded value");
+        });
+
+        let mut handles = HashMap::new();
+        for l in top_num_cores_code_lengths {
+            let bits_arc = Arc::clone(&bits);
+            let coding_arc = Arc::clone(&coding);
+            let cursor_arc = Arc::clone(&cursor);
+            let handle = thread::spawn(move || {
+                let mut len = 0;
+                let mut decoder = coding_arc.decoder();
+                let start_index = cursor_arc.load(Ordering::SeqCst) + l as usize;
+                let mut bits_iter = bits_arc[start_index..].into_iter();
+                while let Some(b) = bits_iter.next() {
+                    len += 1;
+                    if let minimum_redundancy::DecodingResult::Value(v) =
+                        decoder.consume(&coding_arc, *b as u32)
+                    {
+                        black_box(v);
+                        return len;
+                    }
+                }
+                panic!("invalid encoded value");
+            });
+            handles.insert(l, handle);
+        }
+        let producer_len = producer_handle.join().unwrap();
+        if let Some(handle) = handles.remove(&producer_len) {
+            let guess_len = handle.join().unwrap();
+            cursor.fetch_add((producer_len + guess_len) as usize, Ordering::SeqCst);
+        } else {
+            cursor.fetch_add((producer_len) as usize, Ordering::SeqCst);
         }
     }
 }
@@ -277,10 +330,6 @@ pub fn benchmark(conf: &super::Conf) {
         .measure(|| Coding::from_frequencies_cloned(BitsPerFragment(1), &frequencies))
         .as_nanos();
     let coding = Coding::from_frequencies_cloned(BitsPerFragment(1), &frequencies);
-    let coding_arc = Arc::new(Coding::from_frequencies_cloned(
-        BitsPerFragment(1),
-        &frequencies,
-    ));
 
     let enc_constr_ns = conf.measure(|| coding.codes_for_values()).as_nanos();
     let rev_enc_constr_ns = conf
@@ -300,15 +349,22 @@ pub fn benchmark(conf: &super::Conf) {
         .bit_in_range_iter(0..compressed_size_bits)
         .collect();
     conf.print_compressed_size(compressed_size_bits);
-    conf.print_speed(
-        "  decoding from a queue (without storing) using vec instead of iterator",
-        conf.measure(|| decode_spec(coding_arc.clone(), bits.clone())),
-    );
+
+    let coding_arc = Arc::new(Coding::from_frequencies_cloned(
+        BitsPerFragment(1),
+        &frequencies,
+    ));
     let iter = bits.clone().into_iter();
     conf.print_speed(
         "  decoding from a queue (without storing)",
         conf.measure(|| decode(&coding, iter.clone())),
     );
+    let bits_arc = Arc::new(bits);
+    conf.print_speed(
+        "  decoding from a queue (without storing) using speculative execution",
+        conf.measure(|| decode_spec(coding_arc.clone(), bits_arc.clone())),
+    );
+    let coding = Coding::from_frequencies_cloned(BitsPerFragment(1), &frequencies);
 
     if conf.verify {
         verify_queue(&text, compressed_text, &coding, compressed_size_bits);
