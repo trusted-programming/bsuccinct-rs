@@ -112,6 +112,9 @@ fn decode_spec(coding: Arc<Coding<u8>>, bits: Arc<Vec<bool>>) {
     let cursor = Arc::new(AtomicUsize::new(0));
 
     loop {
+        if cursor.load(Ordering::SeqCst) == bits.len() {
+            break;
+        };
         let unique_code_lengths: HashSet<u32> = coding.code_lengths().values().cloned().collect();
         let mut sorted_code_lengths: Vec<u32> = Vec::from_iter(unique_code_lengths);
         sorted_code_lengths.sort_unstable(); // sort_unstable is often faster and appropriate here
@@ -144,10 +147,14 @@ fn decode_spec(coding: Arc<Coding<u8>>, bits: Arc<Vec<bool>>) {
             let bits_arc = Arc::clone(&bits);
             let coding_arc = Arc::clone(&coding);
             let cursor_arc = Arc::clone(&cursor);
+            let start_index = cursor_arc.load(Ordering::SeqCst) + l as usize;
+            if start_index > bits_arc.len() {
+                break;
+            };
             let handle = thread::spawn(move || {
                 let mut len = 0;
                 let mut decoder = coding_arc.decoder();
-                let start_index = cursor_arc.load(Ordering::SeqCst) + l as usize;
+
                 let mut bits_iter = bits_arc[start_index..].into_iter();
                 while let Some(b) = bits_iter.next() {
                     len += 1;
@@ -155,17 +162,20 @@ fn decode_spec(coding: Arc<Coding<u8>>, bits: Arc<Vec<bool>>) {
                         decoder.consume(&coding_arc, *b as u32)
                     {
                         black_box(v);
-                        return len;
+                        return Some(len);
                     }
                 }
-                panic!("invalid encoded value");
+                None
             });
             handles.insert(l, handle);
         }
         let producer_len = producer_handle.join().unwrap();
         if let Some(handle) = handles.remove(&producer_len) {
-            let guess_len = handle.join().unwrap();
-            cursor.fetch_add((producer_len + guess_len) as usize, Ordering::SeqCst);
+            if let Some(guess_len) = handle.join().unwrap() {
+                cursor.fetch_add((producer_len + guess_len) as usize, Ordering::SeqCst);
+            } else {
+                cursor.fetch_add((producer_len) as usize, Ordering::SeqCst);
+            }
         } else {
             cursor.fetch_add((producer_len) as usize, Ordering::SeqCst);
         }
@@ -354,11 +364,11 @@ pub fn benchmark(conf: &super::Conf) {
         BitsPerFragment(1),
         &frequencies,
     ));
-    let iter = bits.clone().into_iter();
-    conf.print_speed(
-        "  decoding from a queue (without storing)",
-        conf.measure(|| decode(&coding, iter.clone())),
-    );
+    // let iter = bits.clone().into_iter();
+    // conf.print_speed(
+    //     "  decoding from a queue (without storing)",
+    //     conf.measure(|| decode(&coding, iter.clone())),
+    // );
     let bits_arc = Arc::new(bits);
     conf.print_speed(
         "  decoding from a queue (without storing) using speculative execution",
