@@ -108,7 +108,50 @@ fn decode(coding: &Coding<u8>, mut bits: impl Iterator<Item = bool>) {
 }
 
 #[inline(always)]
-fn decode_spec(coding: Arc<Coding<u8>>, bits: Arc<Vec<bool>>) {
+fn decode_spec_half(coding: Arc<Coding<u8>>, bits: Arc<Vec<bool>>) {
+    let half_point = bits.len() / 2;
+    let num_cores = std::cmp::max(1, num_cpus::get() - 2);
+    let start_points_spec: Vec<usize> = (half_point..half_point + num_cores).collect();
+    let mut handles = HashMap::new();
+
+    for start_index in start_points_spec.clone() {
+        let bits_arc = Arc::clone(&bits);
+        let coding_arc = Arc::clone(&coding);
+
+        let handle = thread::spawn(move || {
+            let mut d = coding_arc.decoder();
+            let mut bits_iter = bits_arc[start_index..].into_iter();
+            while let Some(b) = bits_iter.next() {
+                if let minimum_redundancy::DecodingResult::Value(v) =
+                    d.consume(&coding_arc, *b as u32)
+                {
+                    black_box(v);
+                    d.reset(coding_arc.degree.as_u32());
+                }
+            }
+        });
+        handles.insert(start_index, handle);
+    }
+
+    let mut cursor = 0;
+    let mut bits_iter = bits.iter();
+    let mut d = coding.decoder();
+
+    while let Some(b) = bits_iter.next() {
+        cursor += 1;
+        if let minimum_redundancy::DecodingResult::Value(v) = d.consume(&coding, *b as u32) {
+            black_box(v);
+            d.reset(coding.degree.as_u32());
+            if let Some(handle) = handles.remove(&cursor) {
+                handle.join().unwrap();
+                break;
+            }
+        }
+    }
+}
+
+#[inline(always)]
+fn decode_spec_next(coding: Arc<Coding<u8>>, bits: Arc<Vec<bool>>) {
     let cursor = Arc::new(AtomicUsize::new(0));
 
     loop {
@@ -364,15 +407,15 @@ pub fn benchmark(conf: &super::Conf) {
         BitsPerFragment(1),
         &frequencies,
     ));
-    // let iter = bits.clone().into_iter();
-    // conf.print_speed(
-    //     "  decoding from a queue (without storing)",
-    //     conf.measure(|| decode(&coding, iter.clone())),
-    // );
+    let iter = bits.clone().into_iter();
+    conf.print_speed(
+        "  decoding from a queue (without storing)",
+        conf.measure(|| decode(&coding, iter.clone())),
+    );
     let bits_arc = Arc::new(bits);
     conf.print_speed(
         "  decoding from a queue (without storing) using speculative execution",
-        conf.measure(|| decode_spec(coding_arc.clone(), bits_arc.clone())),
+        conf.measure(|| decode_spec_half(coding_arc.clone(), bits_arc.clone())),
     );
     let coding = Coding::from_frequencies_cloned(BitsPerFragment(1), &frequencies);
 
