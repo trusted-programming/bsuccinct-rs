@@ -333,7 +333,7 @@ pub fn benchmark(conf: &super::Conf) {
     //println!("Measuring the performance of the generic minimum_redundancy version:");
     println!("### minimum_redundancy, generic version ###");
 
-    let text = conf.text();
+    let text = conf.compressed_image_text();
     let frequencies = frequencies(conf, &text);
 
     let dec_constr_ns = conf

@@ -3,10 +3,14 @@ mod minimum_redundancy;
 mod huffman_compress;
 mod constriction;
 
+use std::fs::{self, File};
+use std::io::{self, Read, Write};
+use std::path::{Path, PathBuf};
 use std::{hint::black_box, time::Instant};
 
 use clap::{Parser, Subcommand};
 
+use libflate::gzip::Encoder;
 use rand::prelude::*;
 use rand::distributions::WeightedIndex;
 use rand_pcg::Pcg64Mcg;
@@ -100,6 +104,56 @@ impl Conf {
         (0u8..=(self.symbols-1) as u8).chain(
             dist.sample_iter(rng).map(|v| v as u8).take(self.len - self.symbols as usize)
         ).collect()
+    }
+
+    /// Returns LZ77 compressed image for testing.
+    fn compressed_image_text(&self) -> Vec<u8> {
+        let test_image_path = Self::get_random_test_image("./data").unwrap();
+        let image_data = Self::read_png_file(test_image_path).unwrap();
+        
+        let compressed_image = Self::lz_compress(&image_data).unwrap();
+
+        compressed_image
+    }
+
+    fn lz_compress(data: &[u8]) -> io::Result<Vec<u8>> {
+        let mut encoder = Encoder::new(Vec::new())?;
+        encoder.write_all(data)?;
+        let compressed_data = encoder.finish().into_result()?;
+    
+        Ok(compressed_data)
+    }
+
+    fn read_png_file(path: String) -> io::Result<Vec<u8>> {
+        let mut buf = Vec::new();
+        let mut file = File::open(path)?;
+        file.read_to_end(&mut buf)?;
+        Ok(buf)
+    }
+
+    fn get_random_test_image<P: AsRef<Path>>(path: P) -> Result<String, String> {
+        let mut rng = thread_rng();
+        let entries = match fs::read_dir(path) {
+            Ok(entries) => entries.filter_map(|entry| {
+                let entry = entry.ok()?;
+                if entry.file_type().ok()?.is_file() {
+                    Some(entry.path())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<PathBuf>>(),
+            Err(_) => return Err("Failed to read directory".to_string()),
+        };
+
+        if entries.is_empty() {
+            Err("No files found in directory".to_string())
+        } else {
+            match entries[rng.gen_range(0..entries.len())].to_str() {
+                Some(path) => Ok(path.to_string()),
+                None => Err("Failed to convert path to string".to_string()),
+            }
+        }
     }
 
     #[inline(always)] fn measure<R, F>(&self, mut f: F) -> f64
