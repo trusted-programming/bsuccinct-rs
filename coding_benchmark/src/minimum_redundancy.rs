@@ -111,45 +111,45 @@ fn decode(coding: &Coding<u8>, mut bits: impl Iterator<Item = bool>) {
 fn decode_spec_half(coding: Arc<Coding<u8>>, bits: Arc<Vec<bool>>) {
     let half_point = bits.len() / 2;
     let num_cores = std::cmp::max(1, num_cpus::get() - 2);
-    let start_points_spec: Vec<usize> = (half_point..half_point + num_cores).collect();
-    let mut handles = HashMap::new();
 
-    for start_index in start_points_spec.clone() {
+    let mut handles = HashMap::with_capacity(num_cores);
+
+    for start_index in half_point..half_point + num_cores {
         let bits_arc = Arc::clone(&bits);
         let coding_arc = Arc::clone(&coding);
 
         let handle = thread::spawn(move || {
-            let mut d = coding_arc.decoder();
-            let mut bits_iter = bits_arc[start_index..].into_iter();
-            while let Some(b) = bits_iter.next() {
+            let mut decoder = coding_arc.decoder();
+            for &bit in &bits_arc[start_index..] {
                 if let minimum_redundancy::DecodingResult::Value(v) =
-                    d.consume(&coding_arc, *b as u32)
+                    decoder.consume(&coding_arc, bit as u32)
                 {
                     black_box(v);
-                    d.reset(coding_arc.degree.as_u32());
+                    decoder.reset(coding_arc.degree.as_u32());
                 }
             }
         });
         handles.insert(start_index, handle);
     }
 
-    let mut cursor = 0;
-    let mut bits_iter = bits.iter();
-    let mut d = coding.decoder();
+    let mut decoder = coding.decoder();
 
-    while let Some(b) = bits_iter.next() {
-        cursor += 1;
-        if let minimum_redundancy::DecodingResult::Value(v) = d.consume(&coding, *b as u32) {
+    for (index, &bit) in bits.iter().enumerate() {
+        if let minimum_redundancy::DecodingResult::Value(v) = decoder.consume(&coding, bit as u32) {
             black_box(v);
-            d.reset(coding.degree.as_u32());
-            if let Some(handle) = handles.remove(&cursor) {
-                handle.join().unwrap();
-                break;
+            decoder.reset(coding.degree.as_u32());
+
+            if let Some(handle) = handles.remove(&index) {
+                if let Err(e) = handle.join() {
+                    eprintln!("Thread encountered an error: {:?}", e);
+                    break;
+                }
             }
         }
     }
 }
 
+#[allow(unused)]
 #[inline(always)]
 fn decode_spec_next(coding: Arc<Coding<u8>>, bits: Arc<Vec<bool>>) {
     let cursor = Arc::new(AtomicUsize::new(0));
@@ -376,7 +376,7 @@ pub fn benchmark(conf: &super::Conf) {
     //println!("Measuring the performance of the generic minimum_redundancy version:");
     println!("### minimum_redundancy, generic version ###");
 
-    let text = conf.compressed_image_text();
+    let text = conf.text();
     let frequencies = frequencies(conf, &text);
 
     let dec_constr_ns = conf
