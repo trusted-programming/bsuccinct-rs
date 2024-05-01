@@ -110,7 +110,8 @@ fn decode(coding: &Coding<u8>, mut bits: impl Iterator<Item = bool>) {
 #[inline(always)]
 fn decode_spec_half(coding: Arc<Coding<u8>>, bits: Arc<Vec<bool>>) {
     let half_point = bits.len() / 2;
-    let num_cores = std::cmp::max(1, num_cpus::get() - 2);
+    let largest_code_lenght = coding.code_lengths().values().max().cloned().unwrap() as usize;
+    let num_cores = std::cmp::min(std::cmp::max(1, num_cpus::get() - 2), largest_code_lenght);
 
     let mut handles = HashMap::with_capacity(num_cores);
 
