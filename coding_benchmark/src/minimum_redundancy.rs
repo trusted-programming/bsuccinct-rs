@@ -121,9 +121,10 @@ fn decode_spec_half(coding: Arc<Coding<u8>>, bits: Arc<Vec<bool>>) {
 
         let handle = thread::spawn(move || {
             let mut decoder = coding_arc.decoder();
-            for &bit in &bits_arc[start_index..] {
+            let mut bits_iter = bits_arc[start_index..].iter();
+            while let Some(bit) = bits_iter.next() {
                 if let minimum_redundancy::DecodingResult::Value(v) =
-                    decoder.consume(&coding_arc, bit as u32)
+                    decoder.consume(&coding_arc, *bit as u32)
                 {
                     black_box(v);
                     decoder.reset(coding_arc.degree.as_u32());
@@ -134,19 +135,22 @@ fn decode_spec_half(coding: Arc<Coding<u8>>, bits: Arc<Vec<bool>>) {
     }
 
     let mut decoder = coding.decoder();
-
-    for (index, &bit) in bits.iter().enumerate() {
-        if let minimum_redundancy::DecodingResult::Value(v) = decoder.consume(&coding, bit as u32) {
+    let mut bits_iter = bits.iter();
+    let mut cursor = 0;
+    while let Some(bit) = bits_iter.next() {
+        if let minimum_redundancy::DecodingResult::Value(v) = decoder.consume(&coding, *bit as u32)
+        {
             black_box(v);
             decoder.reset(coding.degree.as_u32());
 
-            if let Some(handle) = handles.remove(&index) {
+            if let Some(handle) = handles.remove(&cursor) {
                 if let Err(e) = handle.join() {
-                    eprintln!("Thread encountered an error: {:?}", e);
+                    panic!("Thread encountered an error: {:?}", e);
                 }
                 break;
             }
         }
+        cursor += 1;
     }
 }
 
