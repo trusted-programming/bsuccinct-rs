@@ -143,8 +143,8 @@ fn decode_spec_half(coding: Arc<Coding<u8>>, bits: Arc<Vec<bool>>) {
             if let Some(handle) = handles.remove(&index) {
                 if let Err(e) = handle.join() {
                     eprintln!("Thread encountered an error: {:?}", e);
-                    break;
                 }
+                break;
             }
         }
     }
