@@ -1,5 +1,5 @@
-use std::iter::FusedIterator;
 use crate::{Code, Coding, TreeDegree};
+use std::iter::FusedIterator;
 
 /// Iterator over the levels of the huffman tree.
 ///
@@ -8,7 +8,11 @@ use crate::{Code, Coding, TreeDegree};
 /// - number of internal nodes at the level, which equals the bits of codeword assigned to the first leaf at the level,
 /// - index of the level in the tree, which equals to the length of the codewords assigned to leafs at the level.
 #[derive(Copy, Clone)]
-pub struct LevelIterator<'coding, ValueType, D> {
+pub struct LevelIterator<'coding, ValueType, D>
+where
+    ValueType: Clone,
+    D: Clone,
+{
     /// Huffman tree to iterate over.
     coding: &'coding Coding<ValueType, D>,
     /// Index of the last value exposed.
@@ -16,30 +20,47 @@ pub struct LevelIterator<'coding, ValueType, D> {
     /// Size of the whole current level, sum of numbers of: internal nodes, leafs, unused indices (only at the last level)
     level_size: u32,
     /// Index of level of the tree, which is equal to the length of the codewords assigned to leafs at this level.
-    level: u32
+    level: u32,
 }
 
-impl<'coding, ValueType, D: TreeDegree> LevelIterator<'coding, ValueType, D> {
+impl<'coding, ValueType, D: TreeDegree> LevelIterator<'coding, ValueType, D>
+where
+    ValueType: Clone,
+    D: Clone,
+{
     /// Returns iterator over levels of `coding`.
     pub fn new(coding: &'coding Coding<ValueType, D>) -> Self {
         Self {
             coding,
             level_size: coding.degree.as_u32(),
             last_value_index: 0,
-            level: 0
+            level: 0,
         }
     }
 }
 
-impl<'coding, ValueType, D: TreeDegree> FusedIterator for LevelIterator<'coding, ValueType, D> {}
+impl<'coding, ValueType, D: TreeDegree> FusedIterator for LevelIterator<'coding, ValueType, D>
+where
+    ValueType: Clone,
+    D: Clone,
+{
+}
 
-impl<'coding, ValueType, D: TreeDegree> ExactSizeIterator for LevelIterator<'coding, ValueType, D> {
+impl<'coding, ValueType, D: TreeDegree> ExactSizeIterator for LevelIterator<'coding, ValueType, D>
+where
+    ValueType: Clone,
+    D: Clone,
+{
     fn len(&self) -> usize {
         self.coding.internal_nodes_count.len() - self.level as usize
     }
 }
 
-impl<'coding, ValueType, D: TreeDegree> Iterator for LevelIterator<'coding, ValueType, D> {
+impl<'coding, ValueType, D: TreeDegree> Iterator for LevelIterator<'coding, ValueType, D>
+where
+    ValueType: Clone,
+    D: Clone,
+{
     type Item = (&'coding [ValueType], u32, u32);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -48,9 +69,14 @@ impl<'coding, ValueType, D: TreeDegree> Iterator for LevelIterator<'coding, Valu
             let internal_nodes = self.coding.internal_nodes_count[self.level as usize];
             self.level += 1;
             let leaves_count = self.level_size - internal_nodes;
-            self.last_value_index = (value_index + leaves_count as usize).min(self.coding.values.len());
+            self.last_value_index =
+                (value_index + leaves_count as usize).min(self.coding.values.len());
             self.level_size = self.coding.degree * internal_nodes;
-            (&self.coding.values[value_index..self.last_value_index], internal_nodes, self.level)
+            (
+                &self.coding.values[value_index..self.last_value_index],
+                internal_nodes,
+                self.level,
+            )
         })
     }
 
@@ -62,7 +88,11 @@ impl<'coding, ValueType, D: TreeDegree> Iterator for LevelIterator<'coding, Valu
 
 /// Iterator over value-codeword pairs.
 #[derive(Copy, Clone)]
-pub struct CodesIterator<'coding, ValueType, D> {
+pub struct CodesIterator<'coding, ValueType, D>
+where
+    ValueType: Clone,
+    D: Clone,
+{
     /// Iterator over levels.
     level_iterator: LevelIterator<'coding, ValueType, D>,
     /// Index in values that points the value about to be exposed.
@@ -71,25 +101,44 @@ pub struct CodesIterator<'coding, ValueType, D> {
     bits: u32,
 }
 
-impl<'coding, ValueType, D: TreeDegree> CodesIterator<'coding, ValueType, D> {
-    #[inline] pub fn new(coding: &'coding Coding<ValueType, D>) -> Self {
+impl<'coding, ValueType, D: TreeDegree> CodesIterator<'coding, ValueType, D>
+where
+    ValueType: Clone,
+    D: Clone,
+{
+    #[inline]
+    pub fn new(coding: &'coding Coding<ValueType, D>) -> Self {
         Self {
             level_iterator: LevelIterator::new(coding),
             value_index: 0,
-            bits: 0
+            bits: 0,
         }
     }
 }
 
-impl<'coding, ValueType, D: TreeDegree> FusedIterator for CodesIterator<'coding, ValueType, D> {}
+impl<'coding, ValueType, D: TreeDegree> FusedIterator for CodesIterator<'coding, ValueType, D>
+where
+    ValueType: Clone,
+    D: Clone,
+{
+}
 
-impl<'coding, ValueType, D: TreeDegree> ExactSizeIterator for CodesIterator<'coding, ValueType, D> {
-    #[inline] fn len(&self) -> usize {
+impl<'coding, ValueType, D: TreeDegree> ExactSizeIterator for CodesIterator<'coding, ValueType, D>
+where
+    ValueType: Clone,
+    D: Clone,
+{
+    #[inline]
+    fn len(&self) -> usize {
         self.level_iterator.coding.values.len() - self.value_index
     }
 }
 
-impl<'coding, ValueType, D: TreeDegree> Iterator for CodesIterator<'coding, ValueType, D> {
+impl<'coding, ValueType, D: TreeDegree> Iterator for CodesIterator<'coding, ValueType, D>
+where
+    ValueType: Clone,
+    D: Clone,
+{
     type Item = (&'coding ValueType, Code);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -97,14 +146,20 @@ impl<'coding, ValueType, D: TreeDegree> Iterator for CodesIterator<'coding, Valu
             let (_, first_code_bits, _) = self.level_iterator.next()?;
             self.bits = first_code_bits;
         }
-        let result = (&self.level_iterator.coding.values[self.value_index],
-                          Code{ content: self.bits, len: self.level_iterator.level });
+        let result = (
+            &self.level_iterator.coding.values[self.value_index],
+            Code {
+                content: self.bits,
+                len: self.level_iterator.level,
+            },
+        );
         self.value_index += 1;
         self.bits += 1;
         Some(result)
     }
 
-    #[inline] fn size_hint(&self) -> (usize, Option<usize>) {
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
         let len = self.len();
         (len, Some(len))
     }
@@ -112,28 +167,57 @@ impl<'coding, ValueType, D: TreeDegree> Iterator for CodesIterator<'coding, Valu
 
 /// Iterator over value / reversed codeword pairs.
 #[derive(Copy, Clone)]
-pub struct ReversedCodesIterator<'coding, ValueType, D>(CodesIterator<'coding, ValueType, D>);
+pub struct ReversedCodesIterator<'coding, ValueType: Clone, D: Clone>(
+    CodesIterator<'coding, ValueType, D>,
+);
 
-impl<'coding, ValueType, D: TreeDegree> ReversedCodesIterator<'coding, ValueType, D> {
-    #[inline] pub fn new(coding: &'coding Coding<ValueType, D>) -> Self { Self(CodesIterator::new(coding)) }
+impl<'coding, ValueType, D: TreeDegree> ReversedCodesIterator<'coding, ValueType, D>
+where
+    ValueType: Clone,
+    D: Clone,
+{
+    #[inline]
+    pub fn new(coding: &'coding Coding<ValueType, D>) -> Self {
+        Self(CodesIterator::new(coding))
+    }
 }
 
-impl<'coding, ValueType, D: TreeDegree> FusedIterator for ReversedCodesIterator<'coding, ValueType, D> {}
-
-impl<'coding, ValueType, D: TreeDegree> ExactSizeIterator for ReversedCodesIterator<'coding, ValueType, D> {
-    #[inline] fn len(&self) -> usize { self.0.len() }
+impl<'coding, ValueType, D: TreeDegree> FusedIterator
+    for ReversedCodesIterator<'coding, ValueType, D>
+where
+    ValueType: Clone,
+    D: Clone,
+{
 }
 
-impl<'coding, ValueType, D: TreeDegree> Iterator for ReversedCodesIterator<'coding, ValueType, D> {
+impl<'coding, ValueType, D: TreeDegree> ExactSizeIterator
+    for ReversedCodesIterator<'coding, ValueType, D>
+where
+    ValueType: Clone,
+    D: Clone,
+{
+    #[inline]
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
+impl<'coding, ValueType, D: TreeDegree> Iterator for ReversedCodesIterator<'coding, ValueType, D>
+where
+    ValueType: Clone,
+    D: Clone,
+{
     type Item = (&'coding ValueType, Code);
 
-    #[inline] fn next(&mut self) -> Option<Self::Item> {
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
         let mut result = self.0.next()?;
         self.0.level_iterator.coding.reverse_code(&mut result.1);
         Some(result)
     }
 
-    #[inline] fn size_hint(&self) -> (usize, Option<usize>) {
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
         let len = self.len();
         (len, Some(len))
     }

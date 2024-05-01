@@ -11,7 +11,11 @@ use crate::{Coding, DecodingResult, TreeDegree};
 /// - optimistic: *O(1)*
 ///
 /// Memory complexity: *O(1)*
-pub struct Decoder<'huff, ValueType, D> {
+pub struct Decoder<'huff, ValueType, D>
+where
+    ValueType: Clone,
+    D: Clone,
+{
     /// shift+fragment is a current position (node number, counting from the left) at current level.
     shift: u32,
     /// Number of leafs at all previous levels.
@@ -23,7 +27,11 @@ pub struct Decoder<'huff, ValueType, D> {
     _phantom: &'huff PhantomData<(ValueType, D)>, // Use PhantomData to handle the generic type D
 }
 
-impl<'huff, ValueType, D: TreeDegree> Decoder<'huff, ValueType, D> {
+impl<'huff, ValueType, D: TreeDegree> Decoder<'huff, ValueType, D>
+where
+    ValueType: Clone,
+    D: Clone,
+{
     /// Constructs decoder for given `coding`.
     pub fn new(coding_degree: u32) -> Self {
         Self {

@@ -21,9 +21,14 @@ pub use decoder::Decoder;
 mod iterators;
 pub use iterators::{CodesIterator, LevelIterator, ReversedCodesIterator};
 
+#[derive(Clone, Debug)]
 /// Succinct representation of minimum-redundancy coding
 /// (huffman tree of some degree in the canonical form).
-pub struct Coding<ValueType, D = BitsPerFragment> {
+pub struct Coding<ValueType, D = BitsPerFragment>
+where
+    ValueType: Clone, // Ensure ValueType supports cloning
+    D: Clone,         // Ensure D supports cloning
+{
     /// Values, from the most frequent to the least.
     pub values: Box<[ValueType]>,
     /// Number of the internal nodes of each tree level. The root is not counted.
@@ -42,14 +47,22 @@ pub enum ValueSize<'v, ValueType> {
     Variable(&'v dyn Fn(&ValueType) -> usize),
 }
 
-impl<ValueType: GetSize, D> GetSize for Coding<ValueType, D> {
+impl<ValueType: GetSize, D> GetSize for Coding<ValueType, D>
+where
+    ValueType: Clone, // Ensure ValueType supports cloning
+    D: Clone,         // Ensure D supports cloning
+{
     fn size_bytes_dyn(&self) -> usize {
         self.values.size_bytes_dyn() + self.internal_nodes_count.size_bytes_dyn()
     }
     const USES_DYN_MEM: bool = true;
 }
 
-impl<ValueType, D: TreeDegree> Coding<ValueType, D> {
+impl<ValueType, D: TreeDegree> Coding<ValueType, D>
+where
+    ValueType: Clone, // Ensure ValueType supports cloning
+    D: Clone,         // Ensure D supports cloning
+{
     /// Constructs coding for given `frequencies` of values and `degree` of the Huffman tree.
     pub fn from_frequencies<F: Frequencies<Value = ValueType>>(degree: D, frequencies: F) -> Self {
         let (values, mut freq) = frequencies.into_sorted();
@@ -344,7 +357,11 @@ impl<ValueType, D: TreeDegree> Coding<ValueType, D> {
     }*/
 }
 
-impl<ValueType: Hash + Eq, D: TreeDegree> Coding<ValueType, D> {
+impl<ValueType: Hash + Eq, D: TreeDegree> Coding<ValueType, D>
+where
+    ValueType: Clone, // Ensure ValueType supports cloning
+    D: Clone,         // Ensure D supports cloning
+{
     /// Returns a map from (references to) values to the lengths of their codes.
     pub fn code_lengths_ref(&self) -> HashMap<&ValueType, u32> {
         self.codes().map(|(v, c)| (v, c.len)).collect()

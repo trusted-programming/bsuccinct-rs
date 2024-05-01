@@ -412,7 +412,7 @@ pub fn benchmark(conf: &super::Conf) {
         BitsPerFragment(1),
         &frequencies,
     ));
-    let iter = bits.clone().into_iter();
+    let bits_iter = bits.clone().into_iter();
     conf.print_speed(
         "  decoding from a queue (without storing)",
         conf.measure(|| decode(&coding, iter.clone())),
